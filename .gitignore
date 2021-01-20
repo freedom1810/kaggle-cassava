@@ -1,3 +1,15 @@
+.vscode
+*.zip
+checkpoints/
+dataset/
+logs/
+*.out
+test_images/
+test_tfrecords/
+train_images/
+train_tfrecords/
+label_num_to_disease_map.json
+sample_submission.csv
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
