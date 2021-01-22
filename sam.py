@@ -21,6 +21,7 @@ class SAM(torch.optim.Optimizer):
             for p in group["params"]:
                 if p.grad is None: continue
                 e_w = p.grad * scale.to(p)
+                # print(e_w.dtype)
                 p.add_(e_w)  # climb to the local maximum "w + e(w)"
                 self.state[p]["e_w"] = e_w
 
@@ -45,8 +46,10 @@ class SAM(torch.optim.Optimizer):
             self.first_step(zero_grad = zero_grad)
         else:
             self.second_step(zero_grad = zero_grad)
+
     def _grad_norm(self):
-        shared_device = self.param_groups[0]["params"][0].device  # put everything on the same device, in case of model parallelism
+        # put everything on the same device, in case of model parallelism
+        shared_device = self.param_groups[0]["params"][0].device  
         norm = torch.norm(
                     torch.stack([
                         p.grad.norm(p=2).to(shared_device)

@@ -176,3 +176,6 @@ def bi_tempered_logistic_loss(activations, labels, t1 = 0.6, t2 = 1.2, label_smo
     loss_values = temp1 - temp2
 
     return torch.mean(torch.sum(loss_values, dim=-1))
+
+    # loss = torch.mean(torch.sum(loss_values, dim=-1))
+    # return torch.minimum(loss, torch.ones_like(loss)*0.75)

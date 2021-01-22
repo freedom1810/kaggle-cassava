@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import sklearn.metrics as metrics
-from torch.cuda import amp
+from apex import amp
 from augments import mixup, cutmix, snapmix
 import torch.nn.functional as F
 from losses import bi_tempered_logistic_loss
@@ -17,9 +17,9 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
     device_ids = training_params['device_ids']
     augment_prob = model_params['special_augment_prob']
 
+    model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
     model = nn.DataParallel(model, device_ids=device_ids)
-    cuda = device.type != 'cpu'
-    scaler = amp.GradScaler(enabled=cuda)
+
     ema = model_params['ema_model']
 
     print("Epochs: {}\n".format(total_epochs))
@@ -74,51 +74,52 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
         optimizer.zero_grad()
         for images, labels in tqdm.tqdm(loaders["train"]):
             images, labels = images.to(device), labels.to(device)
-            with amp.autocast(enabled=cuda):
-                snapmix_check = False
-                if np.random.rand(1) >= 0:
-                    snapmix_check = True
-                    SNAPMIX_ALPHA = 5.0
-                    mixed_images, labels_1, labels_2, lam_a, lam_b = snapmix(images, labels, SNAPMIX_ALPHA, model)
-                    mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
-                    # outputs, _ = model(mixed_images, train_state = True)
-                    outputs, _ = model(mixed_images)
-                    #print(outputs.shape, labels_1.shape)
-                    loss_a = bi_tempered_logistic_loss(outputs, labels_1)
-                    loss_b = bi_tempered_logistic_loss(outputs, labels_2)
-                    loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
-                    running_labels += labels_1.shape[0]
-                    
-                else:
-                    mixed_images, labels_1, labels_2, lam = cutmix(images, labels)
-                    mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
-                    # outputs, _ = model(mixed_images, train_state = True)
-                    outputs, _ = model(mixed_images)
-                    loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
-                    running_labels += labels_1.shape[0]
+
+            snapmix_check = False
+            if np.random.rand(1) >= 0:
+                snapmix_check = True
+                SNAPMIX_ALPHA = 5.0
+                mixed_images, labels_1, labels_2, lam_a, lam_b = snapmix(images, labels, SNAPMIX_ALPHA, model)
+                mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
+                # outputs, _ = model(mixed_images, train_state = True)
+                outputs, _ = model(mixed_images)
+                #print(outputs.shape, labels_1.shape)
+                loss_a = bi_tempered_logistic_loss(outputs, labels_1)
+                loss_b = bi_tempered_logistic_loss(outputs, labels_2)
+                loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
+                running_labels += labels_1.shape[0]
+                
+            else:
+                mixed_images, labels_1, labels_2, lam = cutmix(images, labels)
+                mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
+                # outputs, _ = model(mixed_images, train_state = True)
+                outputs, _ = model(mixed_images)
+                loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
+                running_labels += labels_1.shape[0]
 
             #first step
-            scaler.scale(loss).backward()
-            scaler.step(optimizer, step = 1, zero_grad=True)
-            scaler.update()
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+            optimizer.first_step(zero_grad=True)
+
 
             #second step
-            with amp.autocast(enabled=cuda):
-                if snapmix_check:
-                    # outputs, _ = model(mixed_images, train_state = True)
-                    outputs, _ = model(mixed_images)
-                    #print(outputs.shape, labels_1.shape)
-                    loss_a = bi_tempered_logistic_loss(outputs, labels_1)
-                    loss_b = bi_tempered_logistic_loss(outputs, labels_2)
-                    loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
-                else:
-                    # outputs, _ = model(mixed_images, train_state = True)
-                    outputs, _ = model(mixed_images)
-                    loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
+            if snapmix_check:
+                # outputs, _ = model(mixed_images, train_state = True)
+                outputs, _ = model(mixed_images)
+                #print(outputs.shape, labels_1.shape)
+                loss_a = bi_tempered_logistic_loss(outputs, labels_1)
+                loss_b = bi_tempered_logistic_loss(outputs, labels_2)
+                loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
+            else:
+                # outputs, _ = model(mixed_images, train_state = True)
+                outputs, _ = model(mixed_images)
+                loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
+            
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()
+            optimizer.second_step(zero_grad=True)
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer, step = 2, zero_grad=True)
-            scaler.update()
 
             if ema:
                 ema.update(model)

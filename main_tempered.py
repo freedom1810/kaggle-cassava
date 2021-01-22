@@ -6,7 +6,7 @@ from sklearn.model_selection import StratifiedKFold
 from data import CassaDataset
 from nets_best import EfficientNetB3DSPlus, ModelEMA
 from losses import LabelSmoothingLoss, SCELoss
-from engines_tempered import trainer_augment
+from engines_tempered_fp16 import trainer_augment
 from torchcontrib.optim import SWA
 from albumentations.pytorch import ToTensorV2
 import math
@@ -26,12 +26,12 @@ from sam import SAM
 path_params = {
     'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/57/{}_fold-{}"
+    'save_path': "checkpoints/58/{}_fold-{}"
 
 }
 
 model_params = {
-    'model_name': 'tf_efficientnet_b0_ns',
+    'model_name': 'tf_efficientnet_b3_ns',
     #'model_name': 'ViT-B_32',
     #'model_name': 'vit_base_patch32_384',
     'img_size': [512, 512],
@@ -52,7 +52,7 @@ optimizer_params = {
 }
 
 training_params = {
-    'training_batch_size': 36,
+    'training_batch_size': 42,
     'num_workers': 10,
     'device': torch.device("cuda:0"),
     'device_ids': [0, 1],
@@ -64,7 +64,7 @@ training_params = {
 
 df = pd.read_csv(path_params['csv_path'])
 
-for fold in range(5):
+for fold in range(1,5):
     """StratifiedKFold"""
     print("="*20, "Fold", fold + 1, "="*20)
     train_df = df[df["fold"] % 5 != fold].reset_index(drop=True)
@@ -120,7 +120,7 @@ for fold in range(5):
     eval_loader = torch.utils.data.DataLoader(
         CassaDataset(
             df=eval_df,
-            #df=train_df[:100], 
+            # df=train_df[:100], 
             #meta_columns=list(eval_df.columns)[1:-2],
             image_folder=path_params['img_path'], 
             image_transform=eval_transform,
