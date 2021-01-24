@@ -36,7 +36,7 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
     # num_layer = 213
     num_layer = 340
     for epoch in range(start_epoch, total_epochs + 1):
-        if epoch <= training_params['warm_up']:
+        if epoch <= training_params['warm_up'] and epoch == 1:
             training_params['TTA_time'] = 1
             ct = 0
             for param in model.parameters():
@@ -85,25 +85,19 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
                     SNAPMIX_ALPHA = 5.0
                     mixed_images, labels_1, labels_2, lam_a, lam_b = snapmix(images, labels, SNAPMIX_ALPHA, model)
                     mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
+                    
                     outputs, _ = model(mixed_images, train_state = True)
-                    # logging.info(mixed_images.dtype)
-                    # outputs, _ = model(mixed_images)
-                    #print(outputs.shape, labels_1.shape)
                     loss_a = bi_tempered_logistic_loss(outputs, labels_1)
                     loss_b = bi_tempered_logistic_loss(outputs, labels_2)
-                    # print('1')
-                    #print(loss_a, loss_b)
                     loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
-                    # print(loss, loss_a, loss_b)
                     running_labels += labels_1.shape[0]
                     
                 else:
                     
                     mixed_images, labels_1, labels_2, lam = cutmix(images, labels)
                     mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
+                    
                     outputs, _ = model(mixed_images, train_state = True)
-                    #print(mixed_images.dtype)
-                    # outputs, _ = model(mixed_images)
                     loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
                     running_labels += labels_1.shape[0]
 
@@ -122,16 +116,11 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
             with amp.autocast(enabled=cuda):
                 if snapmix_check:
                     outputs, _ = model(mixed_images, train_state = True)
-                    # outputs, _ = model(mixed_images)
-                    #print(outputs.shape, labels_1.shape)
                     loss_a = bi_tempered_logistic_loss(outputs, labels_1)
                     loss_b = bi_tempered_logistic_loss(outputs, labels_2)
                     loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
-                    # print('2')
-                    # print(loss, loss_a, loss_b)
                 else:
                     outputs, _ = model(mixed_images, train_state = True)
-                    # outputs, _ = model(mixed_images)
                     loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
 
             scaler.scale(loss).backward()
