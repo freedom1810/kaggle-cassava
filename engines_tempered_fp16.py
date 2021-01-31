@@ -33,8 +33,8 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
         "eval": {"loss": [], "acc": []},
         "lr": []
     }
-    # num_layer = 213
-    num_layer = 340
+    num_layer = 213
+    #num_layer = 340
     for epoch in range(start_epoch, total_epochs + 1):
         if epoch <= training_params['warm_up'] and epoch == 1:
             training_params['TTA_time'] = 1

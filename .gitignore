@@ -1,9 +1,13 @@
 .vscode
 *.zip
 checkpoints/
-dataset/
+image/
+tfrec/
+*.jpg
+*.csv
 logs/
 *.out
+*.txt
 test_images/
 test_tfrecords/
 train_images/

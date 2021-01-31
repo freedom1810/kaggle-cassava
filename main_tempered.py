@@ -21,17 +21,18 @@ from albumentations import (
     IAASharpen, IAAEmboss, RandomBrightnessContrast, Flip, OneOf, Compose, Normalize, Cutout, CoarseDropout, ShiftScaleRotate, CenterCrop, Resize
 )
 from sam import SAM
+import gc
 
 
 path_params = {
-    'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix.csv",
+    'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/58/{}_fold-{}"
+    'save_path': "checkpoints/61/{}_fold-{}"
 
 }
 
 model_params = {
-    'model_name': 'tf_efficientnet_b3_ns',
+    'model_name': 'tf_efficientnet_b0_ns',
     #'model_name': 'ViT-B_32',
     #'model_name': 'vit_base_patch32_384',
     'img_size': [512, 512],
@@ -52,24 +53,24 @@ optimizer_params = {
 }
 
 training_params = {
-    'training_batch_size': 42,
+    'training_batch_size': 72,
     'num_workers': 10,
     'device': torch.device("cuda:0"),
     'device_ids': [0, 1],
     'start_epoch': 1,
     'num_epoch': 75,
-    'warm_up': 10,
-    'TTA_time': 1
+    'warm_up': 9,
+    'TTA_time': 5
 }
 
 df = pd.read_csv(path_params['csv_path'])
 
-for fold in range(1,5):
+for fold in [1, 2, 3, 4,5]:
     """StratifiedKFold"""
-    print("="*20, "Fold", fold + 1, "="*20)
-    train_df = df[df["fold"] % 5 != fold].reset_index(drop=True)
+    print("="*20, "Fold", fold, "="*20)
+    train_df = df[df["fold"] != fold].reset_index(drop=True)
     train_df = shuffle(train_df, random_state = 2020)
-    eval_df = df[df["fold"] % 5 == fold].reset_index(drop=True)
+    eval_df = df[df["fold"] == fold].reset_index(drop=True)
     eval_df = shuffle(eval_df, random_state = 2020)
     """==============="""
     
@@ -98,7 +99,8 @@ for fold in range(1,5):
             image_transform=train_transform,
         ), 
         batch_size=training_params['training_batch_size'], 
-        num_workers=training_params['num_workers']
+        num_workers=training_params['num_workers'],
+        shuffle=True
         #sampler=BalanceClassSampler(list(train_df["target"].values), "downsampling"),
     )
 
@@ -149,4 +151,7 @@ for fold in range(1,5):
 
     trainer_augment(loaders, model_params, model, criterion, val_criterion, optimizer, lr_scheduler, 
                     optimizer_params, training_params, 
-                    save_path= path_params['save_path'].format(model_params['model_name'], fold + 1))
+                    save_path= path_params['save_path'].format(model_params['model_name'], fold))
+    del model, optimizer
+    gc.collect()
+    torch.cuda.empty_cache()
