@@ -27,7 +27,7 @@ import gc
 path_params = {
     'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/61/{}_fold-{}"
+    'save_path': "checkpoints/62/{}_fold-{}"
 
 }
 
@@ -85,7 +85,8 @@ for fold in [1, 2, 3, 4,5]:
             ShiftScaleRotate(p=0.5),
             HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.5),
             RandomBrightnessContrast(brightness_limit=(-0.1,0.1), contrast_limit=(-0.1, 0.1), p=0.5),
-            Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
+            # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
+            Normalize(mean=[0.4342, 0.4967, 0.3154], std=[0.2115, 0.2157, 0.1913], max_pixel_value=255.0, p=1.0),
             #Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=255.0, p=1.0),
             CoarseDropout(p=0.5),
             Cutout(p=0.5),
@@ -113,7 +114,8 @@ for fold in [1, 2, 3, 4,5]:
         ShiftScaleRotate(p=0.5),
         HueSaturationValue(hue_shift_limit=0.2, sat_shift_limit=0.2, val_shift_limit=0.2, p=0.5),
         RandomBrightnessContrast(brightness_limit=(-0.1,0.1), contrast_limit=(-0.1, 0.1), p=0.5),
-        Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
+        # Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], max_pixel_value=255.0, p=1.0),
+        Normalize(mean=[0.4342, 0.4967, 0.3154], std=[0.2115, 0.2157, 0.1913],max_pixel_value=255.0, p=1.0),
         #Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5], max_pixel_value=255.0, p=1.0),
         #CoarseDropout(p=0.5),
         #Cutout(p=0.5),

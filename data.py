@@ -19,7 +19,9 @@ class CassaDataset(torch.utils.data.Dataset):
         label_encoded[np.arange(label.size),int(label)] = 1
         image_path = self.image_folder + item['image_id']
         image = cv2.imread(image_path)
-        #image = cv2.cvtColor(image, code=cv2.COLOR_BGR2RGB)
+        # image = cv2.cvtColor(image, code=cv2.COLOR_BGR2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # image = image / 255
         image = self.image_transform(image=image)["image"]
 
         return image, label
