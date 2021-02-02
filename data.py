@@ -54,9 +54,9 @@ class CassaDataset(torch.utils.data.Dataset):
         # image = cv2.cvtColor(image, code=cv2.COLOR_BGR2RGB)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        has_prob = 0.5
-        if(random.random() <=  has_prob):
-            image = hide_patch(image)
+        # has_prob = 0.5
+        # if(random.random() <=  has_prob):
+        #     image = hide_patch(image)
 
         image = self.image_transform(image=image)["image"]
 

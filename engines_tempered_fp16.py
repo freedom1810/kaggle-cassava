@@ -108,30 +108,31 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
             max_norm = 1.0
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
             '''
-            scaler.step(optimizer, step = 1, zero_grad=False)
+            # scaler.step(optimizer, step = 1, zero_grad=False)
+            scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
 
-            #second step
-            with amp.autocast(enabled=cuda):
-                if snapmix_check:
-                    outputs, _ = model(mixed_images, train_state = True)
-                    loss_a = bi_tempered_logistic_loss(outputs, labels_1)
-                    loss_b = bi_tempered_logistic_loss(outputs, labels_2)
-                    loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
-                else:
-                    outputs, _ = model(mixed_images, train_state = True)
-                    loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
+            # #second step
+            # with amp.autocast(enabled=cuda):
+            #     if snapmix_check:
+            #         outputs, _ = model(mixed_images, train_state = True)
+            #         loss_a = bi_tempered_logistic_loss(outputs, labels_1)
+            #         loss_b = bi_tempered_logistic_loss(outputs, labels_2)
+            #         loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
+            #     else:
+            #         outputs, _ = model(mixed_images, train_state = True)
+            #         loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
 
-            scaler.scale(loss).backward()
-            '''
-            scaler.unscale_(optimizer)
-            max_norm = 1.0
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-            '''
-            scaler.step(optimizer, step = 2, zero_grad=False)
-            scaler.update()
-            optimizer.zero_grad()
+            # scaler.scale(loss).backward()
+            # '''
+            # scaler.unscale_(optimizer)
+            # max_norm = 1.0
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+            # '''
+            # scaler.step(optimizer, step = 2, zero_grad=False)
+            # scaler.update()
+            # optimizer.zero_grad()
 
             if ema:
                 ema.update(model)

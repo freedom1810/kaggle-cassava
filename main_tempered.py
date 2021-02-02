@@ -25,9 +25,10 @@ import gc
 
 
 path_params = {
-    'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
+    # 'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
+    'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_v3.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/63/{}_fold-{}"
+    'save_path': "checkpoints/64/{}_fold-{}"
 
 }
 
@@ -59,7 +60,7 @@ training_params = {
     'device_ids': [0, 1],
     'start_epoch': 1,
     'num_epoch': 75,
-    'warm_up': 9,
+    'warm_up': 5,
     'TTA_time': 5
 }
 
@@ -144,9 +145,9 @@ for fold in [1, 2, 3, 4,5]:
     if optimizer_params['weighted_loss']:
         criterion = SCELoss()
         val_criterion = LabelSmoothingLoss(smoothing = 0, weight = optimizer_params['weight_loss'], training = False)
-    #optimizer = optim.Adam(model.parameters(), lr=5e-4)
-    optimizer = optim.SGD
-    optimizer = SAM(model.parameters(), optimizer, lr=0.1, momentum=0.9)
+    optimizer = optim.Adam(model.parameters(), lr=5e-4)
+    # optimizer = optim.SGD
+    # optimizer = SAM(model.parameters(), optimizer, lr=0.1, momentum=0.9)
     #lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=.1)
     lf = lambda x: ((1 + math.cos(x * math.pi / training_params['num_epoch'])) / 2) * (1 - optimizer_params['lrf']) + optimizer_params['lrf']  # cosine
     lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
