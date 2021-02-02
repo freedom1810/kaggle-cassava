@@ -194,7 +194,10 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
         epoch_accuracy_score = metrics.accuracy_score(running_labels, np.round(final_scores))
         history["eval"]["loss"].append(epoch_loss.cpu().detach().numpy())
         history["eval"]["acc"].append(epoch_accuracy_score)
-        print("{} loss: {:.4f} acc: {:.4f} lr: {:.9f}".format("eval - epoch", epoch_loss, epoch_accuracy_score, optimizer.param_groups[0]["lr"]))
+        print("{} loss: {:.4f} acc: {:.4f} lr: {:.9f}".format("eval - epoch", 
+                                                                epoch_loss, 
+                                                                epoch_accuracy_score, 
+                                                                optimizer.param_groups[0]["lr"]))
         history["lr"].append(optimizer.param_groups[0]["lr"])
         lr_scheduler.step()
 
