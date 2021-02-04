@@ -58,13 +58,20 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
             for param in model.parameters():
                 param.requires_grad = True
 
+            # for module in model.modules():
+            #     if isinstance(module, nn.BatchNorm2d):
+            #         if hasattr(module, 'weight'):
+            #             module.weight.requires_grad_(True)
+            #         if hasattr(module, 'bias'):
+            #             module.bias.requires_grad_(True)
+            #         module.train()
             for module in model.modules():
                 if isinstance(module, nn.BatchNorm2d):
                     if hasattr(module, 'weight'):
-                        module.weight.requires_grad_(True)
+                        module.weight.requires_grad_(False)
                     if hasattr(module, 'bias'):
-                        module.bias.requires_grad_(True)
-                    module.train()
+                        module.bias.requires_grad_(False)
+                    module.eval()
 
         epoch_save_path = save_path + '_epoch-{}.pt'.format(epoch)
         head = "epoch {:2}/{:2}".format(epoch, total_epochs)
@@ -87,8 +94,8 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
                     mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
                     
                     outputs, _ = model(mixed_images, train_state = True)
-                    loss_a = criterion(outputs, labels_1)
-                    loss_b = criterion(outputs, labels_2)
+                    loss_a = bi_tempered_logistic_loss(outputs, labels_1)
+                    loss_b = bi_tempered_logistic_loss(outputs, labels_2)
                     loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
                     running_labels += labels_1.shape[0]
                     
@@ -172,7 +179,7 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
 
                     outputs_softmax = F.log_softmax(outputs, dim=-1)
                     scores = torch.argmax(outputs_softmax, 1)
-                    loss = criterion(outputs, labels)
+                    loss = bi_tempered_logistic_loss(outputs, labels)
                     running_labels += list(labels.unsqueeze(1).data.cpu().numpy())
                     running_scores += list(scores.cpu().detach().numpy())
                     running_outputs_softmax = np.append(running_outputs_softmax, outputs_softmax.cpu().detach().numpy(), axis = 0)
@@ -189,7 +196,7 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
 
         final_scores_softmax_torch = torch.tensor(final_scores/training_params['TTA_time'], dtype=torch.float32)
         running_labels_torch = torch.tensor(running_labels, dtype=torch.float32)
-        epoch_loss = criterion(final_scores_softmax_torch.to(device = training_params['device']), 
+        epoch_loss = bi_tempered_logistic_loss(final_scores_softmax_torch.to(device = training_params['device']), 
                                                 running_labels_torch.squeeze().to(device = training_params['device']))
         final_scores = np.argmax(final_scores, axis = 1)
         epoch_accuracy_score = metrics.accuracy_score(running_labels, np.round(final_scores))

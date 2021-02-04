@@ -27,7 +27,7 @@ import gc
 path_params = {
     'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/64/{}_fold-{}"
+    'save_path': "checkpoints/65/{}_fold-{}"
 
 }
 
