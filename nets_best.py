@@ -12,6 +12,21 @@ from sys import stderr
 from torch.cuda.amp import autocast
 # for type hint
 from torch import Tensor
+
+from prettytable import PrettyTable
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad: 
+            continue
+        param = parameter.numel()
+        table.add_row([name, param])
+        total_params+=param
+    print(table)
+    print("Total Trainable Params: {}".format(total_params))
+    return total_params
+
 def is_parallel(model):
     return type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel)
 
@@ -27,8 +42,20 @@ class EfficientNetB3DSPlus(nn.Module):
     def __init__(self, model_params, n_class = 5, pretrained=True):
         super().__init__()
         backbone = timm.create_model(model_params['model_name'], pretrained=pretrained)
-        n_features = backbone.classifier.in_features
-        #n_features = backbone.head.in_features
+        # count_parameters(backbone)
+        # for name, param in backbone.named_modules():
+        #     # if param.requires_grad:
+        #     # ct +=1 
+        #     # if ct <= num_layer - 2:
+        #     print(name)
+        # # print(ct)
+        # print(backbone.fc.in_features)
+
+        try:
+            n_features = backbone.classifier.in_features
+        except:
+            n_features = backbone.fc.in_features
+            #n_features = backbone.head.in_features
         self.backbone = nn.Sequential(*backbone.children())[:-2]
         self.classifier = nn.Linear(n_features, n_class)
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
@@ -38,18 +65,18 @@ class EfficientNetB3DSPlus(nn.Module):
         return x
 
     def forward(self, x, train_state = False):
-        if train_state:
-            with autocast():
-                feats = self.forward_features(x)
-                #print('\n1', x.shape, feats.shape, self.classifier)
-                x = self.pool(feats).view(x.size(0), -1)
-                #print(x.shape)
-                x = self.classifier(x)
-                #print(x.shape)
-        else:
+        # if train_state:
+        with autocast(enabled=train_state):
             feats = self.forward_features(x)
+            #print('\n1', x.shape, feats.shape, self.classifier)
             x = self.pool(feats).view(x.size(0), -1)
+            #print(x.shape)
             x = self.classifier(x)
+            #print(x.shape)
+        # else:
+        #     feats = self.forward_features(x)
+        #     x = self.pool(feats).view(x.size(0), -1)
+        #     x = self.classifier(x)
         return x, feats
 
 

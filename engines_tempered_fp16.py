@@ -58,20 +58,13 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
             for param in model.parameters():
                 param.requires_grad = True
 
-            # for module in model.modules():
-            #     if isinstance(module, nn.BatchNorm2d):
-            #         if hasattr(module, 'weight'):
-            #             module.weight.requires_grad_(True)
-            #         if hasattr(module, 'bias'):
-            #             module.bias.requires_grad_(True)
-            #         module.train()
             for module in model.modules():
                 if isinstance(module, nn.BatchNorm2d):
                     if hasattr(module, 'weight'):
-                        module.weight.requires_grad_(False)
+                        module.weight.requires_grad_(True)
                     if hasattr(module, 'bias'):
-                        module.bias.requires_grad_(False)
-                    module.eval()
+                        module.bias.requires_grad_(True)
+                    module.train()
 
         epoch_save_path = save_path + '_epoch-{}.pt'.format(epoch)
         head = "epoch {:2}/{:2}".format(epoch, total_epochs)

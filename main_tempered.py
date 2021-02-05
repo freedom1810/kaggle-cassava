@@ -27,12 +27,13 @@ import gc
 path_params = {
     'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/65/{}_fold-{}"
+    'save_path': "checkpoints/66/{}_fold-{}"
 
 }
 
 model_params = {
-    'model_name': 'tf_efficientnet_b0_ns',
+    # 'model_name': 'tf_efficientnet_b0_ns',
+    'model_name': 'seresnext50_32x4d',
     #'model_name': 'ViT-B_32',
     #'model_name': 'vit_base_patch32_384',
     'img_size': [512, 512],
@@ -53,7 +54,7 @@ optimizer_params = {
 }
 
 training_params = {
-    'training_batch_size': 72,
+    'training_batch_size': 48,
     'num_workers': 10,
     'device': torch.device("cuda:0"),
     'device_ids': [0, 1],
