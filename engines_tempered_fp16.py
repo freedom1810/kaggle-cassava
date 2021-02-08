@@ -33,15 +33,16 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
         "eval": {"loss": [], "acc": []},
         "lr": []
     }
-    num_layer = 213
+    num_layer = 418
     #num_layer = 340
     for epoch in range(start_epoch, total_epochs + 1):
-        if epoch <= training_params['warm_up'] and epoch == 1:
-            training_params['TTA_time'] = 1
-            ct = 0
+        # if epoch <= training_params['warm_up'] and epoch == 1:
+        #     training_params['TTA_time'] = 1
+        ct = 0
+        if epoch == start_epoch:
             for param in model.parameters():
                 ct += 1
-                if ct <= num_layer - 2:
+                if ct <= num_layer - 5:
                     param.requires_grad = False
 
             for module in model.modules():
@@ -51,26 +52,31 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
                     if hasattr(module, 'bias'):
                         module.bias.requires_grad_(False)
                     module.eval()
-            #print('-------------------------', ct)
+        #     #print('-------------------------', ct)
 
-        elif epoch == training_params['warm_up'] + 1:
-            training_params['TTA_time'] = 5
-            for param in model.parameters():
-                param.requires_grad = True
+        # elif epoch == training_params['warm_up'] + 1:
+        #     training_params['TTA_time'] = 5
+        #     for param in model.parameters():
+        #         param.requires_grad = True
 
-            for module in model.modules():
-                if isinstance(module, nn.BatchNorm2d):
-                    if hasattr(module, 'weight'):
-                        module.weight.requires_grad_(True)
-                    if hasattr(module, 'bias'):
-                        module.bias.requires_grad_(True)
-                    module.train()
+        #     for module in model.modules():
+        #         if isinstance(module, nn.BatchNorm2d):
+        #             if hasattr(module, 'weight'):
+        #                 module.weight.requires_grad_(True)
+        #             if hasattr(module, 'bias'):
+        #                 module.bias.requires_grad_(True)
+        #             module.train()
 
         epoch_save_path = save_path + '_epoch-{}.pt'.format(epoch)
         head = "epoch {:2}/{:2}".format(epoch, total_epochs)
         print(head + "\n" + "-"*(len(head)))
 
-        model.train()
+        model.eval()
+        
+        model.module.classifier.train()
+        model.module.backbone[4].train()
+        model.module.backbone[5].train()
+
         running_labels = 0
         running_scores = []
         running_loss = 0.0

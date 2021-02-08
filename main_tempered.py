@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import StratifiedKFold
 from data import CassaDataset
-from nets_best import EfficientNetB3DSPlus, ModelEMA
+from nets_best import EfficientNetB3DSPlus, ModelEMA, count_parameters
 from losses import LabelSmoothingLoss, SCELoss, FocalCosineLoss
 from engines_tempered_fp16 import trainer_augment
 from torchcontrib.optim import SWA
@@ -26,17 +26,19 @@ import gc
 
 path_params = {
     'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
+    # 'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_v3.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/66/{}_fold-{}"
+    'save_path': "checkpoints/70/{}_fold-{}"
 
 }
 
 model_params = {
-    # 'model_name': 'tf_efficientnet_b0_ns',
-    'model_name': 'seresnext50_32x4d',
+    'model_name': 'tf_efficientnet_b4_ns',
+    # 'model_name': 'seresnext50_32x4d',
     #'model_name': 'ViT-B_32',
     #'model_name': 'vit_base_patch32_384',
     'img_size': [512, 512],
+    # 'img_size': [600, 600],
     'num_classes': 5,
     'ds': False,
     'ds_blocks': [10, 15],
@@ -54,7 +56,7 @@ optimizer_params = {
 }
 
 training_params = {
-    'training_batch_size': 48,
+    'training_batch_size': 28,
     'num_workers': 10,
     'device': torch.device("cuda:0"),
     'device_ids': [0, 1],
@@ -112,8 +114,10 @@ for fold in [2]:
     )
 
     eval_transform = Compose([
-        CenterCrop(600, 600),
-        Resize(model_params['img_size'][0], model_params['img_size'][1], cv2.INTER_AREA),
+        # CenterCrop(600, 600),
+        # Resize(model_params['img_size'][0], model_params['img_size'][1], cv2.INTER_AREA),
+        Resize(model_params['img_size'][0], int(model_params['img_size'][1] * 800 /600), cv2.INTER_AREA),
+        CenterCrop(512, 512),
         Transpose(p=0.5),
         HorizontalFlip(p=0.5),
         VerticalFlip(p=0.5),
@@ -136,7 +140,7 @@ for fold in [2]:
             image_folder=path_params['img_path'], 
             image_transform=eval_transform,
         ), 
-        batch_size=training_params['training_batch_size']*2, 
+        batch_size=training_params['training_batch_size']*4, 
         num_workers=training_params['num_workers']
     )
 
@@ -153,7 +157,35 @@ for fold in [2]:
         criterion = FocalCosineLoss()
         val_criterion = LabelSmoothingLoss(smoothing = 0, weight = optimizer_params['weight_loss'], training = False)
 
-    optimizer = optim.Adam(model.parameters(), lr=5e-4)
+    
+    
+    ckpt = torch.load('/home/hana/sonnh/kaggle-cassava/checkpoints/68/tf_efficientnet_b4_ns_fold-2_epoch-20.pt')
+    x = list(model.state_dict().keys())
+    y = ckpt['model_state_dict']
+    from collections import OrderedDict
+    new_state_dict = OrderedDict()
+    for i, w in enumerate(y.items()):
+        k, v = w
+        name = x[i] # remove `module.`
+        new_state_dict[name] = v
+    model.load_state_dict(new_state_dict)
+
+    count_parameters(model)
+    # model.eval()
+    # for name, param in model.named_parameters():
+    #         if param.requires_grad:
+    #         # ct +=1 
+    #         # if ct <= num_layer - 2:
+    #             print(name)
+    #     # print('num layer: ',ct)
+    #     # print(backbone.fc.in_features)
+    
+    # # print(x)
+
+    optimizer = optim.Adam(model.parameters(), lr=5e-6)
+
+    # from ranger import Ranger 
+    # optimizer = Ranger(model.parameters(), lr=5e-4)
     # optimizer = optim.SGD
     # optimizer = SAM(model.parameters(), optimizer, lr=0.1, momentum=0.9)
 
