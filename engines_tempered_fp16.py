@@ -13,7 +13,17 @@ from sam import SAM
 import logging
 logging.basicConfig(level=logging.INFO)
 
-def trainer_augment(loaders, model_params, model, criterion, val_criterion, optimizer, lr_scheduler, optimizer_params, training_params, save_path):
+def trainer_augment(loaders, 
+                    model_params, 
+                    model, 
+                    criterion, 
+                    val_criterion, 
+                    optimizer, 
+                    lr_scheduler, 
+                    optimizer_params, 
+                    training_params, 
+                    save_path):
+
     start_epoch = training_params['start_epoch']
     total_epochs = training_params['num_epoch']
     device = training_params['device']
@@ -33,16 +43,16 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
         "eval": {"loss": [], "acc": []},
         "lr": []
     }
+    # num_layer = 213
+    # num_layer = 340
     num_layer = 418
-    #num_layer = 340
     for epoch in range(start_epoch, total_epochs + 1):
-        # if epoch <= training_params['warm_up'] and epoch == 1:
-        #     training_params['TTA_time'] = 1
-        ct = 0
-        if epoch == start_epoch:
+        if epoch <= training_params['warm_up'] and epoch == 1:
+            training_params['TTA_time'] = 1
+            ct = 0
             for param in model.parameters():
                 ct += 1
-                if ct <= num_layer - 5:
+                if ct <= num_layer - 2:
                     param.requires_grad = False
 
             for module in model.modules():
@@ -52,31 +62,26 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
                     if hasattr(module, 'bias'):
                         module.bias.requires_grad_(False)
                     module.eval()
-        #     #print('-------------------------', ct)
+            #print('-------------------------', ct)
 
-        # elif epoch == training_params['warm_up'] + 1:
-        #     training_params['TTA_time'] = 5
-        #     for param in model.parameters():
-        #         param.requires_grad = True
+        elif epoch == training_params['warm_up'] + 1:
+            training_params['TTA_time'] = 5
+            for param in model.parameters():
+                param.requires_grad = True
 
-        #     for module in model.modules():
-        #         if isinstance(module, nn.BatchNorm2d):
-        #             if hasattr(module, 'weight'):
-        #                 module.weight.requires_grad_(True)
-        #             if hasattr(module, 'bias'):
-        #                 module.bias.requires_grad_(True)
-        #             module.train()
+            for module in model.modules():
+                if isinstance(module, nn.BatchNorm2d):
+                    if hasattr(module, 'weight'):
+                        module.weight.requires_grad_(True)
+                    if hasattr(module, 'bias'):
+                        module.bias.requires_grad_(True)
+                    module.train()
 
         epoch_save_path = save_path + '_epoch-{}.pt'.format(epoch)
         head = "epoch {:2}/{:2}".format(epoch, total_epochs)
         print(head + "\n" + "-"*(len(head)))
 
-        model.eval()
-        
-        model.module.classifier.train()
-        model.module.backbone[4].train()
-        model.module.backbone[5].train()
-
+        model.train()
         running_labels = 0
         running_scores = []
         running_loss = 0.0
@@ -92,7 +97,7 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
                     mixed_images, labels_1, labels_2, lam_a, lam_b = snapmix(images, labels, SNAPMIX_ALPHA, model)
                     mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
                     
-                    outputs, _ = model(mixed_images, train_state = True)
+                    outputs, _ = model(mixed_images, train_state = cuda)
                     loss_a = bi_tempered_logistic_loss(outputs, labels_1)
                     loss_b = bi_tempered_logistic_loss(outputs, labels_2)
                     loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
@@ -103,42 +108,16 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
                     mixed_images, labels_1, labels_2, lam = cutmix(images, labels)
                     mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
                     
-                    outputs, _ = model(mixed_images, train_state = True)
+                    outputs, _ = model(mixed_images, train_state = cuda)
                     loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
                     running_labels += labels_1.shape[0]
 
             #first step
             scaler.scale(loss).backward()
-            '''
-            scaler.unscale_(optimizer)
-            max_norm = 1.0
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-            '''
-            # scaler.step(optimizer, step = 1, zero_grad=False)
             scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
 
-            # #second step
-            # with amp.autocast(enabled=cuda):
-            #     if snapmix_check:
-            #         outputs, _ = model(mixed_images, train_state = True)
-            #         loss_a = bi_tempered_logistic_loss(outputs, labels_1)
-            #         loss_b = bi_tempered_logistic_loss(outputs, labels_2)
-            #         loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
-            #     else:
-            #         outputs, _ = model(mixed_images, train_state = True)
-            #         loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
-
-            # scaler.scale(loss).backward()
-            # '''
-            # scaler.unscale_(optimizer)
-            # max_norm = 1.0
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-            # '''
-            # scaler.step(optimizer, step = 2, zero_grad=False)
-            # scaler.update()
-            # optimizer.zero_grad()
 
             if ema:
                 ema.update(model)

@@ -25,10 +25,10 @@ import gc
 
 
 path_params = {
-    'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_1234.csv",
+    'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_v3_fuse2_fold13.csv",
     # 'csv_path': "/home/hana/sonnh/kaggle-cassava/dataset/train_mix/new_mix_v3.csv",
     'img_path': "/home/hana/sonnh/kaggle-cassava/dataset/original_mix/",
-    'save_path': "checkpoints/70/{}_fold-{}"
+    'save_path': "checkpoints/75/{}_fold-{}"
 
 }
 
@@ -56,8 +56,8 @@ optimizer_params = {
 }
 
 training_params = {
-    'training_batch_size': 28,
-    'num_workers': 10,
+    'training_batch_size': 30,
+    'num_workers': 16,
     'device': torch.device("cuda:0"),
     'device_ids': [0, 1],
     'start_epoch': 1,
@@ -68,7 +68,7 @@ training_params = {
 
 df = pd.read_csv(path_params['csv_path'])
 
-for fold in [2]:
+for fold in [1,2,3,4,5]:
     # for mean, std in [[[0.485, 0.456, 0.406], [0.229, 0.224, 0.225]], 
     #                 [[0.4342, 0.4967, 0.3154],[0.2115, 0.2157, 0.1913]]]: 
     # print(' mean {} std {}'.format(mean, std))
@@ -114,10 +114,10 @@ for fold in [2]:
     )
 
     eval_transform = Compose([
-        # CenterCrop(600, 600),
-        # Resize(model_params['img_size'][0], model_params['img_size'][1], cv2.INTER_AREA),
-        Resize(model_params['img_size'][0], int(model_params['img_size'][1] * 800 /600), cv2.INTER_AREA),
-        CenterCrop(512, 512),
+        CenterCrop(600, 600),
+        Resize(model_params['img_size'][0], model_params['img_size'][1], cv2.INTER_AREA),
+        # Resize(model_params['img_size'][0], int(model_params['img_size'][1] * 800 /600), cv2.INTER_AREA),
+        # CenterCrop(512, 512),
         Transpose(p=0.5),
         HorizontalFlip(p=0.5),
         VerticalFlip(p=0.5),
@@ -140,7 +140,7 @@ for fold in [2]:
             image_folder=path_params['img_path'], 
             image_transform=eval_transform,
         ), 
-        batch_size=training_params['training_batch_size']*4, 
+        batch_size=training_params['training_batch_size']*2, 
         num_workers=training_params['num_workers']
     )
 
@@ -149,6 +149,11 @@ for fold in [2]:
         "eval": eval_loader,
     }
     model = EfficientNetB3DSPlus(model_params).to(training_params['device'])
+    ct = 0
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            ct +=1 
+    print(ct)
     # model = VitB3DSPlus(model_params).to(training_params['device'])
     if model_params['EMA']:
         model_params['ema_model'] = ModelEMA(model)
@@ -157,39 +162,20 @@ for fold in [2]:
         criterion = FocalCosineLoss()
         val_criterion = LabelSmoothingLoss(smoothing = 0, weight = optimizer_params['weight_loss'], training = False)
 
-    
-    
-    ckpt = torch.load('/home/hana/sonnh/kaggle-cassava/checkpoints/68/tf_efficientnet_b4_ns_fold-2_epoch-20.pt')
-    x = list(model.state_dict().keys())
-    y = ckpt['model_state_dict']
-    from collections import OrderedDict
-    new_state_dict = OrderedDict()
-    for i, w in enumerate(y.items()):
-        k, v = w
-        name = x[i] # remove `module.`
-        new_state_dict[name] = v
-    model.load_state_dict(new_state_dict)
 
-    count_parameters(model)
-    # model.eval()
-    # for name, param in model.named_parameters():
-    #         if param.requires_grad:
-    #         # ct +=1 
-    #         # if ct <= num_layer - 2:
-    #             print(name)
-    #     # print('num layer: ',ct)
-    #     # print(backbone.fc.in_features)
-    
-    # # print(x)
+    # ckpt = torch.load('/home/hana/sonnh/kaggle-cassava/checkpoints/68/tf_efficientnet_b4_ns_fold-2_epoch-20.pt')
+    # x = list(model.state_dict().keys())
+    # y = ckpt['model_state_dict']
+    # from collections import OrderedDict
+    # new_state_dict = OrderedDict()
+    # for i, w in enumerate(y.items()):
+    #     k, v = w
+    #     name = x[i] # remove `module.`
+    #     new_state_dict[name] = v
+    # model.load_state_dict(new_state_dict)
 
-    optimizer = optim.Adam(model.parameters(), lr=5e-6)
+    optimizer = optim.Adam(model.parameters(), lr=5e-4)
 
-    # from ranger import Ranger 
-    # optimizer = Ranger(model.parameters(), lr=5e-4)
-    # optimizer = optim.SGD
-    # optimizer = SAM(model.parameters(), optimizer, lr=0.1, momentum=0.9)
-
-    #lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=25, gamma=.1)
     lf = lambda x: ((1 + math.cos(x * math.pi / training_params['num_epoch'])) / 2) * (1 - optimizer_params['lrf']) + optimizer_params['lrf']  # cosine
     lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
 

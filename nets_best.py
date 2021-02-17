@@ -42,16 +42,16 @@ class EfficientNetB3DSPlus(nn.Module):
     def __init__(self, model_params, n_class = 5, pretrained=True):
         super().__init__()
         backbone = timm.create_model(model_params['model_name'], pretrained=pretrained)
-        count_parameters(backbone)
+        # count_parameters(backbone)
         # ct = 0
         # for name, param in backbone.named_parameters():
-        #     # if param.requires_grad:
-        #     ct +=1 
+        #     if param.requires_grad:
+        #         ct +=1 
         #     # if ct <= num_layer - 2:
-        #     print(name)
-        # print('num layer: ',ct)
-        # print(backbone.fc.in_features)
-        
+        #     # print(name)
+        # # print('num layer: ',ct)
+        # # print(backbone.fc.in_features)
+        # print(ct)
         try:
             n_features = backbone.classifier.in_features
         except:
