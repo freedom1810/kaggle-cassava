@@ -5,9 +5,31 @@ import torch.nn as nn
 import numpy as np
 import sklearn.metrics as metrics
 from torch.cuda import amp
-from augments import mixup, cutmix, snapmix
 import torch.nn.functional as F
-def trainer_augment(loaders, model_params, model, criterion, val_criterion, optimizer, lr_scheduler, optimizer_params, training_params, save_path):
+
+
+from .augments import mixup, cutmix, snapmix
+
+from loss.bi_tempered_logistic_loss import bi_tempered_logistic_loss
+
+from optimizer.sam import SAM
+
+from .utils import freeze_model, unfreeze_model, save_checkpoint
+
+import logging
+logging.basicConfig(level=logging.INFO)
+
+def trainer_augment(loaders, 
+                    model_params, 
+                    model, 
+                    criterion, 
+                    val_criterion, 
+                    optimizer, 
+                    lr_scheduler, 
+                    optimizer_params, 
+                    training_params, 
+                    save_path):
+
     start_epoch = training_params['start_epoch']
     total_epochs = training_params['num_epoch']
     device = training_params['device']
@@ -27,37 +49,18 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
         "eval": {"loss": [], "acc": []},
         "lr": []
     }
+    # num_layer = 213
+    # num_layer = 340
     num_layer = 418
     for epoch in range(start_epoch, total_epochs + 1):
-        if epoch <= training_params['warm_up']:
+        if epoch <= training_params['warm_up'] and epoch == 1:
             training_params['TTA_time'] = 1
-            ct = 0
-            for param in model.parameters():
-                ct += 1
-                if ct <= num_layer - 1:
-                    param.requires_grad = False
-            print(ct)
-            for module in model.modules():
-                if isinstance(module, nn.BatchNorm2d):
-                    if hasattr(module, 'weight'):
-                        module.weight.requires_grad_(False)
-                    if hasattr(module, 'bias'):
-                        module.bias.requires_grad_(False)
-                    module.eval()
+            model = freeze_model(model, num_layer)
             #print('-------------------------', ct)
 
         elif epoch == training_params['warm_up'] + 1:
             training_params['TTA_time'] = 5
-            for param in model.parameters():
-                param.requires_grad = True
-
-            for module in model.modules():
-                if isinstance(module, nn.BatchNorm2d):
-                    if hasattr(module, 'weight'):
-                        module.weight.requires_grad_(True)
-                    if hasattr(module, 'bias'):
-                        module.bias.requires_grad_(True)
-                    module.train()
+            model = unfreeze_model(model)
 
         epoch_save_path = save_path + '_epoch-{}.pt'.format(epoch)
         head = "epoch {:2}/{:2}".format(epoch, total_epochs)
@@ -71,19 +74,36 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
         for images, labels in tqdm.tqdm(loaders["train"]):
             images, labels = images.to(device), labels.to(device)
             with amp.autocast(enabled=cuda):
-                SNAPMIX_ALPHA = 5.0
-                mixed_images, labels_1, labels_2, lam_a, lam_b = snapmix(images, labels, SNAPMIX_ALPHA, model)
-                mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
-                outputs, _ = model(mixed_images, train_state = True)
-                loss_a = criterion(outputs, labels_1)
-                loss_b = criterion(outputs, labels_2)
-                loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
-                running_labels += labels_1.shape[0]
+                
+                snapmix_check = False
+                if np.random.rand(1) >= 0:
+                    snapmix_check = True
+                    SNAPMIX_ALPHA = 5.0
+                    mixed_images, labels_1, labels_2, lam_a, lam_b = snapmix(images, labels, SNAPMIX_ALPHA, model)
+                    mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
+                    
+                    outputs, _ = model(mixed_images, train_state = cuda)
+                    loss_a = bi_tempered_logistic_loss(outputs, labels_1)
+                    loss_b = bi_tempered_logistic_loss(outputs, labels_2)
+                    loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
+                    running_labels += labels_1.shape[0]
+                    
+                else:
+                    
+                    mixed_images, labels_1, labels_2, lam = cutmix(images, labels)
+                    mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
+                    
+                    outputs, _ = model(mixed_images, train_state = cuda)
+                    loss = lam*criterion(outputs, labels_1.unsqueeze(1)) + (1 - lam)*criterion(outputs, labels_2.unsqueeze(1))
+                    running_labels += labels_1.shape[0]
 
+            #first step
             scaler.scale(loss).backward()
-            scaler.step(optimizer)  # optimizer.step
+            scaler.step(optimizer)
             scaler.update()
             optimizer.zero_grad()
+
+
             if ema:
                 ema.update(model)
 
@@ -122,7 +142,7 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
 
                     outputs_softmax = F.log_softmax(outputs, dim=-1)
                     scores = torch.argmax(outputs_softmax, 1)
-                    loss = val_criterion(outputs, labels.unsqueeze(1))
+                    loss = bi_tempered_logistic_loss(outputs, labels)
                     running_labels += list(labels.unsqueeze(1).data.cpu().numpy())
                     running_scores += list(scores.cpu().detach().numpy())
                     running_outputs_softmax = np.append(running_outputs_softmax, outputs_softmax.cpu().detach().numpy(), axis = 0)
@@ -139,28 +159,24 @@ def trainer_augment(loaders, model_params, model, criterion, val_criterion, opti
 
         final_scores_softmax_torch = torch.tensor(final_scores/training_params['TTA_time'], dtype=torch.float32)
         running_labels_torch = torch.tensor(running_labels, dtype=torch.float32)
-        epoch_loss = val_criterion(final_scores_softmax_torch, running_labels_torch, TTA = True)
-        print(criterion(final_scores_softmax_torch, running_labels_torch, TTA = True))
+        epoch_loss = bi_tempered_logistic_loss(final_scores_softmax_torch.to(device = training_params['device']), 
+                                                running_labels_torch.squeeze().to(device = training_params['device']))
         final_scores = np.argmax(final_scores, axis = 1)
         epoch_accuracy_score = metrics.accuracy_score(running_labels, np.round(final_scores))
         history["eval"]["loss"].append(epoch_loss.cpu().detach().numpy())
         history["eval"]["acc"].append(epoch_accuracy_score)
-        print("{} loss: {:.4f} acc: {:.4f} lr: {:.4f}".format("eval - epoch", epoch_loss, epoch_accuracy_score, optimizer.param_groups[0]["lr"]))
+        print("{} loss: {:.4f} acc: {:.4f} lr: {:.9f}".format("eval - epoch", 
+                                                                epoch_loss, 
+                                                                epoch_accuracy_score, 
+                                                                optimizer.param_groups[0]["lr"]))
         history["lr"].append(optimizer.param_groups[0]["lr"])
         lr_scheduler.step()
 
         if epoch_accuracy_score > best_acc:
             best_epoch = epoch
             best_acc = epoch_accuracy_score
-
-        state_dicts = {
-            "model_state_dict": model_eval.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "lr_scheduler_state_dict": lr_scheduler.state_dict(),
-            "start_epoch": epoch + 1
-        }
-
-        torch.save(state_dicts, epoch_save_path)
+        save_checkpoint(model_eval, optimizer, lr_scheduler, epoch, epoch_save_path)
+        
     print("\nFinish: - Best Epoch: {} - Best accuracy: {}\n".format(best_epoch, best_acc))
 
 

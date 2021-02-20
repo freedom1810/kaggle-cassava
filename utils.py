@@ -64,3 +64,18 @@ def efficientnet_params(model_name):
     params = dict_params[model_name]
 
     return params
+
+
+def load_checkpoint(path, model):
+    ckpt = torch.load('/home/hana/sonnh/kaggle-cassava/checkpoints/68/tf_efficientnet_b4_ns_fold-2_epoch-20.pt')
+    x = list(model.state_dict().keys())
+    y = ckpt['model_state_dict']
+    from collections import OrderedDict
+    new_state_dict = OrderedDict()
+    for i, w in enumerate(y.items()):
+        k, v = w
+        name = x[i] # remove `module.`
+        new_state_dict[name] = v
+    model.load_state_dict(new_state_dict)
+
+    return model

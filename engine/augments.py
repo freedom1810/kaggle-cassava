@@ -92,7 +92,6 @@ def get_spm(input,target,model):
 
     return outmaps,clslogit
 
-
 def snapmix(input, target, alpha, model=None):
     r = np.random.rand(1)
     lam_a = torch.ones(input.size(0))
