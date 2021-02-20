@@ -17,6 +17,7 @@ from config import *
 from loss.focal_cosine_loss import FocalCosineLoss
 from loss.label_smoothing_loss import LabelSmoothingLoss
 from loss.bi_tempered_logistic_loss import bi_tempered_logistic_loss
+from loss.sce_loss import SCELoss
 
 from net.nets import EfficientNetB3DSPlus
 from net.ema import ModelEMA 
@@ -56,7 +57,7 @@ for fold in [1,2,3,4,5]:
 
     train_loader = torch.utils.data.DataLoader(
         CassaDataset(
-            df=train_df[:100],
+            df=train_df,
             image_folder=path_params['img_path'],
             image_transform=train_transform,
         ), 
@@ -79,7 +80,7 @@ for fold in [1,2,3,4,5]:
     ])
     eval_loader = torch.utils.data.DataLoader(
         CassaDataset(
-            df=eval_df[:100],
+            df=eval_df,
             image_folder=path_params['img_path'], 
             image_transform=eval_transform,
         ), 
@@ -101,7 +102,7 @@ for fold in [1,2,3,4,5]:
     if model_params['EMA']:
         model_params['ema_model'] = ModelEMA(model)
     if optimizer_params['weighted_loss']:
-        # criterion = SCELoss()
+        # criterion = FocalCosineLoss()
         criterion = bi_tempered_logistic_loss
         val_criterion = bi_tempered_logistic_loss
 

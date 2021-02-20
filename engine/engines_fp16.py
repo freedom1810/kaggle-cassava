@@ -7,10 +7,7 @@ import sklearn.metrics as metrics
 from torch.cuda import amp
 import torch.nn.functional as F
 
-
 from .augments import mixup, cutmix, snapmix
-
-from optimizer.sam import SAM
 
 from .utils import freeze_model, unfreeze_model, save_checkpoint
 
