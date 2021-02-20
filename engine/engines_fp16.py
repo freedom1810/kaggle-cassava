@@ -10,8 +10,6 @@ import torch.nn.functional as F
 
 from .augments import mixup, cutmix, snapmix
 
-from loss.bi_tempered_logistic_loss import bi_tempered_logistic_loss
-
 from optimizer.sam import SAM
 
 from .utils import freeze_model, unfreeze_model, save_checkpoint
@@ -83,8 +81,8 @@ def trainer_augment(loaders,
                     mixed_images, labels_1, labels_2 = torch.autograd.Variable(mixed_images), torch.autograd.Variable(labels_1), torch.autograd.Variable(labels_2)
                     
                     outputs, _ = model(mixed_images, train_state = cuda)
-                    loss_a = bi_tempered_logistic_loss(outputs, labels_1)
-                    loss_b = bi_tempered_logistic_loss(outputs, labels_2)
+                    loss_a = criterion(outputs, labels_1)
+                    loss_b = criterion(outputs, labels_2)
                     loss = torch.mean(loss_a * lam_a + loss_b * lam_b)
                     running_labels += labels_1.shape[0]
                     
@@ -142,7 +140,7 @@ def trainer_augment(loaders,
 
                     outputs_softmax = F.log_softmax(outputs, dim=-1)
                     scores = torch.argmax(outputs_softmax, 1)
-                    loss = bi_tempered_logistic_loss(outputs, labels)
+                    loss = val_criterion(outputs, labels)
                     running_labels += list(labels.unsqueeze(1).data.cpu().numpy())
                     running_scores += list(scores.cpu().detach().numpy())
                     running_outputs_softmax = np.append(running_outputs_softmax, outputs_softmax.cpu().detach().numpy(), axis = 0)
@@ -159,7 +157,7 @@ def trainer_augment(loaders,
 
         final_scores_softmax_torch = torch.tensor(final_scores/training_params['TTA_time'], dtype=torch.float32)
         running_labels_torch = torch.tensor(running_labels, dtype=torch.float32)
-        epoch_loss = bi_tempered_logistic_loss(final_scores_softmax_torch.to(device = training_params['device']), 
+        epoch_loss = val_criterion(final_scores_softmax_torch.to(device = training_params['device']), 
                                                 running_labels_torch.squeeze().to(device = training_params['device']))
         final_scores = np.argmax(final_scores, axis = 1)
         epoch_accuracy_score = metrics.accuracy_score(running_labels, np.round(final_scores))

@@ -16,6 +16,7 @@ from config import *
 
 from loss.focal_cosine_loss import FocalCosineLoss
 from loss.label_smoothing_loss import LabelSmoothingLoss
+from loss.bi_tempered_logistic_loss import bi_tempered_logistic_loss
 
 from net.nets import EfficientNetB3DSPlus
 from net.ema import ModelEMA 
@@ -101,8 +102,8 @@ for fold in [1,2,3,4,5]:
         model_params['ema_model'] = ModelEMA(model)
     if optimizer_params['weighted_loss']:
         # criterion = SCELoss()
-        criterion = FocalCosineLoss()
-        val_criterion = LabelSmoothingLoss(smoothing = 0, weight = optimizer_params['weight_loss'], training = False)
+        criterion = bi_tempered_logistic_loss
+        val_criterion = bi_tempered_logistic_loss
 
     optimizer = optim.Adam(model.parameters(), lr=5e-4)
 
