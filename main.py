@@ -42,7 +42,8 @@ for fold in [1,2,3,4,5]:
     """==============="""
     
     train_transform = Compose([
-            RandomResizedCrop(model_params['img_size'][0], model_params['img_size'][1], interpolation = cv2.INTER_CUBIC),
+            # RandomResizedCrop(model_params['img_size'][0], model_params['img_size'][1], interpolation = cv2.INTER_CUBIC),
+            Resize(model_params['img_size'][0], model_params['img_size'][1], cv2.INTER_AREA),
             Transpose(p=0.5),
             HorizontalFlip(p=0.5),
             VerticalFlip(p=0.5),
@@ -67,7 +68,7 @@ for fold in [1,2,3,4,5]:
     )
 
     eval_transform = Compose([
-        CenterCrop(600, 600),
+        # CenterCrop(600, 600),
         Resize(model_params['img_size'][0], model_params['img_size'][1], cv2.INTER_AREA),
         Transpose(p=0.5),
         HorizontalFlip(p=0.5),
@@ -106,7 +107,7 @@ for fold in [1,2,3,4,5]:
         criterion = bi_tempered_logistic_loss
         val_criterion = bi_tempered_logistic_loss
 
-    optimizer = optim.Adam(model.parameters(), lr=5e-4)
+    optimizer = optim.Adam(model.parameters(), optimizer_params['lr'])
 
     lf = lambda x: ((1 + math.cos(x * math.pi / training_params['num_epoch'])) / 2) * (1 - optimizer_params['lrf']) + optimizer_params['lrf']  # cosine
     lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
