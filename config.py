@@ -34,6 +34,7 @@ model_params = {
 }
 
 optimizer_params = {
+    'lr': 5e-4
     'weighted_loss': True,
     # 'weight_loss': torch.tensor([1.0, 0.43, 0.49, 0.1, 0.52]),
     'weight_loss': None,
@@ -47,8 +48,8 @@ training_params = {
     'device_ids': [0, 1],
     'start_epoch': 1,
     'num_epoch': 50,
-    'warm_up': 5,
-    'TTA_time': 5
+    'warm_up': 0,
+    'TTA_time': 1
 }
 
 
