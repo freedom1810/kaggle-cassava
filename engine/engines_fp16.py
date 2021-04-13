@@ -72,6 +72,8 @@ def trainer_augment(loaders,
 
                 outputs, _ = model(images, train_state=cuda)
                 loss = criterion(outputs, labels)
+                running_labels += labels.shape[0]
+
 
                 # snapmix_check = False
                 # if np.random.rand(1) >= 2:
@@ -178,7 +180,4 @@ def trainer_augment(loaders,
         save_checkpoint(model_eval, optimizer, lr_scheduler, epoch, epoch_save_path)
         
     print("\nFinish: - Best Epoch: {} - Best accuracy: {}\n".format(best_epoch, best_acc))
-
-
-
     
