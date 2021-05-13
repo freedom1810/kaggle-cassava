@@ -21,8 +21,8 @@ path_params = {
 model_params = {
     'model_name': 'tf_efficientnet_b4_ns',
     # 'model_name': 'seresnext50_32x4d',
-    #'model_name': 'ViT-B_32',
-    #'model_name': 'vit_base_patch32_384',
+    # 'model_name': 'ViT-B_32',
+    # 'model_name': 'vit_base_patch32_384',
     'img_size': [512, 512],
     'num_classes': 5,
     'ds': False,
@@ -33,11 +33,24 @@ model_params = {
     
 }
 
+loss_params = {
+    'name': 'bi_tempered_logistic_loss',
+    'kwargs': {
+        # 'weighted_loss': True,
+        # 'weight_loss': None,
+        # 'weight_loss': torch.tensor([1.0, 0.43, 0.49, 0.1, 0.52]),
+                },
+    'val_kwargs': {
+        # 'weighted_loss': True,
+        # 'weight_loss': None,
+        # 'weight_loss': torch.tensor([1.0, 0.43, 0.49, 0.1, 0.52]),
+                }
+                }
+
 optimizer_params = {
-    'lr': 5e-4
-    'weighted_loss': True,
-    # 'weight_loss': torch.tensor([1.0, 0.43, 0.49, 0.1, 0.52]),
-    'weight_loss': None,
+    'name': 'adam',
+    'kwargs': {
+        'lr': 5e-4,},
     'lrf': 1e-2
 }
 

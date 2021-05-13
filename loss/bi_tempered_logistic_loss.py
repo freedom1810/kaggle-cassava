@@ -77,33 +77,38 @@ def tempered_softmax(activations, t, num_iters=5):
 
     return exp_t(activations - normalization_constants, t)
 
+class BTLLoss():
+    def __init__(sefl):
+        pass
 
-def bi_tempered_logistic_loss(activations, labels, t1 = 0.6, t2 = 1.2, label_smoothing=0.1, num_iters=5):
-    labels = labels.to(int)
-    labels = torch.nn.functional.one_hot(labels, num_classes = 5)
-    """Bi-Tempered Logistic Loss with custom gradient.
-    Args:
-    activations: A multi-dimensional tensor with last dimension `num_classes`.
-    labels: A tensor with shape and dtype as activations.
-    t1: Temperature 1 (< 1.0 for boundedness).
-    t2: Temperature 2 (> 1.0 for tail heaviness, < 1.0 for finite support).
-    label_smoothing: Label smoothing parameter between [0, 1).
-    num_iters: Number of iterations to run the method.
-    Returns:
-    A loss tensor.
-    """
+    
+    # def bi_tempered_logistic_loss(activations, labels, t1 = 0.6, t2 = 1.2, label_smoothing=0.1, num_iters=5):
+    def __call__(self, activations, labels, t1 = 0.6, t2 = 1.2, label_smoothing=0.1, num_iters=5):
+        labels = labels.to(int)
+        labels = torch.nn.functional.one_hot(labels, num_classes = 5)
+        """Bi-Tempered Logistic Loss with custom gradient.
+        Args:
+        activations: A multi-dimensional tensor with last dimension `num_classes`.
+        labels: A tensor with shape and dtype as activations.
+        t1: Temperature 1 (< 1.0 for boundedness).
+        t2: Temperature 2 (> 1.0 for tail heaviness, < 1.0 for finite support).
+        label_smoothing: Label smoothing parameter between [0, 1).
+        num_iters: Number of iterations to run the method.
+        Returns:
+        A loss tensor.
+        """
 
-    if label_smoothing > 0.0:
-        num_classes = labels.shape[-1]
-        labels = (1 - num_classes / (num_classes - 1) * label_smoothing) * labels + label_smoothing / (num_classes - 1)
+        if label_smoothing > 0.0:
+            num_classes = labels.shape[-1]
+            labels = (1 - num_classes / (num_classes - 1) * label_smoothing) * labels + label_smoothing / (num_classes - 1)
 
-    probabilities = tempered_softmax(activations, t2, num_iters)
-    #print('\n', probabilities.shape, labels.shape)
-    temp1 = (log_t(labels + 1e-10, t1) - log_t(probabilities, t1)) * labels
-    temp2 = (1 / (2 - t1)) * (torch.pow(labels, 2 - t1) - torch.pow(probabilities, 2 - t1))
-    loss_values = temp1 - temp2
+        probabilities = tempered_softmax(activations, t2, num_iters)
+        #print('\n', probabilities.shape, labels.shape)
+        temp1 = (log_t(labels + 1e-10, t1) - log_t(probabilities, t1)) * labels
+        temp2 = (1 / (2 - t1)) * (torch.pow(labels, 2 - t1) - torch.pow(probabilities, 2 - t1))
+        loss_values = temp1 - temp2
 
-    return torch.mean(torch.sum(loss_values, dim=-1))
+        return torch.mean(torch.sum(loss_values, dim=-1))
 
     # loss = torch.mean(torch.sum(loss_values, dim=-1))
     # return torch.minimum(loss, torch.ones_like(loss)*0.75)

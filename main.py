@@ -1,38 +1,33 @@
-import torch
 import cv2
-import torch.nn as nn
-import torch.optim as optim
-from sklearn.model_selection import StratifiedKFold
-from torchcontrib.optim import SWA
-from albumentations.pytorch import ToTensorV2
 import math
-from torch.nn import BCELoss
 import pandas as pd
-from sklearn.utils import shuffle
-from albumentations import *
 import gc
 
-from config import *
+import torch
+from sklearn.utils import shuffle
+from albumentations import Compose, Resize, Transpose, HorizontalFlip, \
+                        VerticalFlip, ShiftScaleRotate, HueSaturationValue, \
+                        RandomBrightnessContrast, Normalize, \
+                        CoarseDropout, Cutout
 
-from loss.focal_cosine_loss import FocalCosineLoss
-from loss.label_smoothing_loss import LabelSmoothingLoss
-from loss.bi_tempered_logistic_loss import bi_tempered_logistic_loss
-from loss.sce_loss import SCELoss
+from albumentations.pytorch.transforms import ToTensorV2
+
+from config import path_params, optimizer_params, training_params, model_params, loss_params
+
+from loss import LOSSES
+from optimizer import OPTIM
 
 from net.nets import EfficientNetB3DSPlus
-from net.ema import ModelEMA 
-from net.utils import count_parameters
+from net.ema import ModelEMA
+# from net.utils import count_parameters
 
 from dataloader.data import CassaDataset
 
 from engine.engines_fp16 import trainer_augment
 
-from optimizer.sam import SAM
-
-
 df = pd.read_csv(path_params['csv_path'])
 
-for fold in [1,2,3,4,5]:
+for fold in [1, 2, 3, 4, 5]:
     """StratifiedKFold"""
     print("="*20, "Fold", fold, "="*20)
     train_df = df[df["fold"] != fold].reset_index(drop=True)
@@ -102,25 +97,24 @@ for fold in [1,2,3,4,5]:
 
     if model_params['EMA']:
         model_params['ema_model'] = ModelEMA(model)
-    if optimizer_params['weighted_loss']:
-        # criterion = FocalCosineLoss()
-        criterion = bi_tempered_logistic_loss
-        val_criterion = bi_tempered_logistic_loss
 
-    optimizer = optim.Adam(model.parameters(), optimizer_params['lr'])
+    criterion = LOSSES[loss_params['name']](**loss_params['kwargs'])
+    val_criterion = LOSSES[loss_params['name']](**loss_params['val_kwargs'])
+
+    optimizer = OPTIM[optimizer_params['name']](model.parameters(), **optimizer_params['kwargs'])
 
     lf = lambda x: ((1 + math.cos(x * math.pi / training_params['num_epoch'])) / 2) * (1 - optimizer_params['lrf']) + optimizer_params['lrf']  # cosine
-    lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
 
-    trainer_augment(loaders, 
-                    model_params, 
-                    model, 
-                    criterion, 
-                    val_criterion, 
-                    optimizer, 
-                    lr_scheduler, 
-                    optimizer_params, 
-                    training_params, 
+    trainer_augment(loaders,
+                    model_params,
+                    model,
+                    criterion,
+                    val_criterion,
+                    optimizer,
+                    lr_scheduler,
+                    optimizer_params,
+                    training_params,
                     save_path= path_params['save_path'].format(model_params['model_name'], fold))
 
     del model, optimizer
